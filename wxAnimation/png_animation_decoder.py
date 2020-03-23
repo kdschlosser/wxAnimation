@@ -155,14 +155,11 @@ class wxPNGDecoder(animation_decoder.wxAnimationDecoder):
                 continue
 
             elif chunk_type == PNG_MARKER_fcTL:
-                print len(chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
-                print repr(chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
                 if any(type_ == PNG_MARKER_IDAT for type_, data in frame_chunks):
                     frame_chunks.append(end)
                     control.image = PNGImage(frame_chunks)
                     frames.append(control)
                     frame_has_head_chunks = False
-                    print struct.unpack("!IIIIIHHbb", chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
                     control = PNGFrame(*struct.unpack("!IIIIIHHbb", chunk_data.split(PNG_MARKER_fcTL)[-1][:-4]))
                     hdr = _make_chunk(
                         PNG_MARKER_IHDR,
@@ -171,9 +168,6 @@ class wxPNGDecoder(animation_decoder.wxAnimationDecoder):
 
                     frame_chunks = [hdr]
                 else:
-                    print len(chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
-                    print repr(chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
-                    print struct.unpack("!IIIIIHHbb", chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
                     control = PNGFrame(*struct.unpack("!IIIIIHHbb", chunk_data.split(PNG_MARKER_fcTL)[-1][:-4]))
 
             elif chunk_type == PNG_MARKER_IDAT:
@@ -204,6 +198,14 @@ class wxPNGDecoder(animation_decoder.wxAnimationDecoder):
         self.m_frames = sorted(frames, key=lambda x: x.index)
         self.m_plays = num_plays
         self.m_nFrames = num_frames
+
+        max_width = 0
+        max_height = 0
+        for frame in self.m_frames:
+            max_width = max(frame.width, max_width)
+            max_height = max(frame.height, max_height)
+
+        self.m_szAnimation = wx.Size(max_width, max_height)
         return wxPNG_OK
 
     def Destroy(self):

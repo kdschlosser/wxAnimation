@@ -51,10 +51,7 @@ class wxAnimation(wx.adv.Animation):
             super(wxAnimation, self).__init__()
         else:
             self.m_isSuper = False
-            res = self.LoadFile(name, type)
-            print res
-
-            if res:
+            if self.LoadFile(name, type):
                 super(wxAnimation, self).__init__()
             else:
                 self.m_isSuper = True

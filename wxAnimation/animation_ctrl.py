@@ -47,6 +47,15 @@ from .animation_decoder import (
 )
 
 
+# There needed to be a change made on how the handling of rendering the animation takes place.
+# I have done this to improve overall performance of rendering the images to the screen.
+# I have moved the drawing of the frames to the wxAnimationDecoder class. This way
+# how the drawing gets rendered is dependent on the decoder and not the control it's self.
+# because each animation specification is going to be different with diffferent ways of rendering
+# a frame it is bets to do it this way so the actual does not have to account for all of those
+# different specifications. The AnimationCtrl thus becomes a mechanism to deligate work and has
+# no knowledge of how the work is being done.
+
 class wxAnimationCtrl(wx.adv.AnimationCtrl):
 
     def __init__(
@@ -357,8 +366,6 @@ class wxAnimationCtrl(wx.adv.AnimationCtrl):
             self.DisposeToBackground(dc)
         else:
             dispose_method = self.m_animation.GetDisposalMethod(self.m_currentFrame - 1)
-
-            print dispose_method
 
             if dispose_method == wxANIM_TOBACKGROUND:
                 self.DisposeToBackground(
