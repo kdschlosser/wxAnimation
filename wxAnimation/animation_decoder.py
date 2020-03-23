@@ -57,7 +57,7 @@ class wxAnimationDecoder(wxObjectRefData):
     def CanRead(self, stream):
 
         if not hasattr(stream, 'seek'):
-            return False  #  can't test unseekable stream
+            return False  # can't test unseekable stream
 
         posOld = stream.tell()
         ok = self.DoCanRead(stream)

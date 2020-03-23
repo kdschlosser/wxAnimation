@@ -47,36 +47,39 @@ class wxAnimation(wx.adv.Animation):
         self.m_refData = None
 
         if name is None:
-            self.m_use_super = True
+            self.m_isSuper = True
             super(wxAnimation, self).__init__()
         else:
-            try:
-                self.m_use_super = True
+            self.m_isSuper = False
+            res = self.LoadFile(name, type)
+            print res
+
+            if res:
+                super(wxAnimation, self).__init__()
+            else:
+                self.m_isSuper = True
                 super(wxAnimation, self).__init__(name, type)
-            except:
-                self.m_use_super = False
-                self.LoadFile(name, type)
 
     def IsOk(self):
-        if self.m_use_super:
+        if self.m_isSuper:
             return super(wxAnimation, self).IsOk()
 
         return self.m_refData is not None
 
     def GetFrameCount(self):
-        if self.m_use_super:
+        if self.m_isSuper:
             return super(wxAnimation, self).GetFrameCount()
 
         return self.m_refData.GetFrameCount()
 
     def GetDelay(self, i):
-        if self.m_use_super:
+        if self.m_isSuper:
             return super(wxAnimation, self).GetDelay(i)
 
         return self.m_refData.GetDelay(i)
 
     def GetFrame(self, i):
-        if self.m_use_super:
+        if self.m_isSuper:
             return super(wxAnimation, self).GetFrame(i)
 
         img = self.m_refData.ConvertToImage(i)
@@ -86,13 +89,13 @@ class wxAnimation(wx.adv.Animation):
         return img
 
     def GetSize(self):
-        if self.m_use_super:
+        if self.m_isSuper:
             return super(wxAnimation, self).GetSize()
 
         return self.m_refData.GetAnimationSize()
 
     def LoadFile(self, filename, type=wxANIMATION_TYPE_ANY):
-        if self.m_use_super:
+        if self.m_isSuper:
             return super(wxAnimation, self).LoadFile(filename, type)
         try:
             with open(filename, 'rb') as f:
@@ -103,10 +106,10 @@ class wxAnimation(wx.adv.Animation):
         return self.Load(stream, type)
 
     def Load(self, stream, type=wxANIMATION_TYPE_ANY):
-        if self.m_use_super:
+        if self.m_isSuper:
             return super(wxAnimation, self).Load(stream, type)
 
-        self.UnRef()
+        # self.UnRef()
 
         if type == wxANIMATION_TYPE_ANY:
             for handler in wxAnimation.sm_handlers:
@@ -133,19 +136,24 @@ class wxAnimation(wx.adv.Animation):
             return self.m_refData.Load(stream)
 
     def GetFramePosition(self, frame):
-        return self.m_refData.GetFramePosition(frame)
+        if not self.m_isSuper:
+            return self.m_refData.GetFramePosition(frame)
 
     def GetFrameSize(self, frame):
-        return self.m_refData.GetFrameSize(frame)
+        if not self.m_isSuper:
+            return self.m_refData.GetFrameSize(frame)
 
     def GetDisposalMethod(self, frame):
-        return self.m_refData.GetDisposalMethod(frame)
+        if not self.m_isSuper:
+            return self.m_refData.GetDisposalMethod(frame)
 
     def GetTransparentColour(self, frame):
-        return self.m_refData.GetTransparentColour(frame)
+        if not self.m_isSuper:
+            return self.m_refData.GetTransparentColour(frame)
 
     def GetBackgroundColour(self):
-        return self.m_refData.GetBackgroundColour()
+        if not self.m_isSuper:
+            return self.m_refData.GetBackgroundColour()
 
     @staticmethod
     def GetHandlers():
@@ -182,3 +190,7 @@ class wxAnimation(wx.adv.Animation):
     @staticmethod
     def InitStandardHandlers():
         wxAnimation.sm_handlers.append(wxPNGDecoder())
+
+
+wxAnimation.InitStandardHandlers()
+

@@ -47,7 +47,7 @@ from .animation_decoder import (
 )
 
 
-class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
+class wxAnimationCtrl(wx.adv.AnimationCtrl):
 
     def __init__(
         self,
@@ -61,18 +61,24 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
     ):
         self.m_animation = anim
 
-        if anim.GetType() != wxANIMATION_TYPE_PNG:
+        if not isinstance(anim, wxAnimation):
+            self.m_isSuper = True
             super(wxAnimationCtrl, self).__init__(parent, id, anim, pos, size, style, name)
         else:
+            self.m_isSuper = False
             self.m_bmpStatic = wx.Bitmap(0, 0)
             self.m_bmpStaticReal = wx.Bitmap(0, 0)
             self.m_currentFrame = 0
             self.m_looped = False
-            self.m_timer = None
-            self.m_animation = wxAnimation()
             self.m_isPlaying = False
             self.m_useWinBackgroundColour = True
             self.m_backingStore = wx.Bitmap(0, 0)
+            super(wxAnimationCtrl, self).__init__(parent, id, wx.adv.NullAnimation, pos, size, style, name)
+            self.m_timer = wx.Timer(self)
+
+            self.Bind(wx.EVT_TIMER, self.OnTimer)
+            self.Bind(wx.EVT_PAINT, self.OnPaint)
+            self.Bind(wx.EVT_SIZE, self.OnSize)
 
     def Init(self):
         self.m_currentFrame = 0
@@ -92,16 +98,17 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         style=wx.adv.AC_DEFAULT_STYLE,
         name=wx.adv.AnimationCtrlNameStr
     ):
-        if animation.GetType() != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             return super(wxAnimationCtrl, self).Create(parent, id, animation, pos, size, style, name)
 
-        self.m_timer = wx.Timer()
+        super(wxAnimationCtrl, self).Create(parent, id, wx.adv.NullAnimation, pos, size, style, name)
+
         self.SetBackgroundColour(parent.GetBackgroundColour())
         self.SetAnimation(animation)
         return True
 
     def LoadFile(self, filename, type=wxANIMATION_TYPE_ANY):
-        if type != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             return super(wxAnimationCtrl, self).LoadFile(filename, type)
 
         try:
@@ -113,7 +120,7 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         return self.Load(fis, type)
 
     def Load(self, stream, type=wxANIMATION_TYPE_ANY):
-        if type != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             return super(wxAnimationCtrl, self).Load(stream, type)
 
         anim = wxAnimation()
@@ -123,7 +130,7 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         self.SetAnimation(anim)
 
     def Stop(self):
-        if self.m_animation.GetType() != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             return super(wxAnimationCtrl, self).Stop()
 
         self.m_timer.Stop()
@@ -132,7 +139,7 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         self.DisplayStaticImage()
 
     def Play(self, looped=True):
-        if self.m_animation.GetType() != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             return super(wxAnimationCtrl, self).Play()
 
         if not self.m_animation.IsOk():
@@ -159,17 +166,16 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         return True
 
     def IsPlaying(self):
-        if self.m_animation.GetType() != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             return super(wxAnimationCtrl, self).IsPlaying()
 
         return self.m_isPlaying
 
     def SetAnimation(self, animation):
-        if self.m_animation.GetType() != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             if super(wxAnimationCtrl, self).IsPlaying():
                 super(wxAnimationCtrl, self).Stop()
 
-        if animation.GetType() != wxANIMATION_TYPE_PNG:
             return super(wxAnimationCtrl, self).SetAnimation(animation)
 
         self.m_animation = animation
@@ -186,13 +192,13 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         self.DisplayStaticImage()
 
     def GetAnimation(self):
-        if self.m_animation.GetType() != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             return super(wxAnimationCtrl, self).GetAnimation()
 
         return self.m_animation
 
     def SetInactiveBitmap(self, bmp):
-        if self.m_animation.GetType() != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             return super(wxAnimationCtrl, self).SetInactiveBitmap(bmp)
 
         self.m_bmpStatic = bmp
@@ -204,7 +210,7 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
             self.DisplayStaticImage()
 
     def SetBackgroundColour(self, col):
-        if not super(wx.Control, self).SetBackgroundColour(col):
+        if not wx.Control.SetBackgroundColour(self, col):
             return False
 
         if not self.IsPlaying():
@@ -213,6 +219,9 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         return True
 
     def OnPaint(self, _):
+        if self.m_isSuper:
+            return
+
         # VERY IMPORTANT: the wxPaintDC *must* be created in any case
         dc = wx.PaintDC(self)
 
@@ -227,6 +236,9 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
             self.DisposeToBackground(dc)
 
     def OnTimer(self, _):
+        if self.m_isSuper:
+            return
+
         self.m_currentFrame += 1
         if self.m_currentFrame == self.m_animation.GetFrameCount():
             # Should a non-looped animation display the last frame?
@@ -245,9 +257,13 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         delay = self.m_animation.GetDelay(self.m_currentFrame)
         if delay == 0:
             delay = 1  # 0 is invalid timeout for wxTimer.
+
         self.m_timer.Start(delay, True)
 
     def OnSize(self, _):
+        if self.m_isSuper:
+            return
+
         # NB: resizing an animation control may take a lot of time
         #     for big animations as the backing store must be
         #     extended and rebuilt. Try to avoid it e.g. using
@@ -263,30 +279,42 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
                     self.Stop()  # in case we are playing
 
     def SetUseWindowBackgroundColour(self, useWinBackground=True):
-        if self.m_animation.GetType() != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             return
 
         self.m_useWinBackgroundColour = useWinBackground
 
     def IsUsingWindowBackgroundColour(self):
-        if self.m_animation.GetType() != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             return True
 
         return self.m_useWinBackgroundColour
 
     def DrawCurrentFrame(self, dc):
+        if self.m_isSuper:
+            return
+
         assert self.m_backingStore.IsOk()
 
         #  m_backingStore always contains the current frame
         dc.DrawBitmap(self.m_backingStore, 0, 0, True)  # use mask in case it's present
 
     def GetBackingStore(self):
+        if self.m_isSuper:
+            return
+
         return self.m_backingStore
 
     def FitToAnimation(self):
+        if self.m_isSuper:
+            return
+
         self.SetSize(self.m_animation.GetSize())
 
     def DisposeToBackground(self, dc=None, pos=None, sz=None):
+        if self.m_isSuper:
+            return
+
         if dc is None:
             # clear the backing store
             dc = wx.MemoryDC()
@@ -312,6 +340,9 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
                 dc.DrawRectangle(pos, sz)
 
     def IncrementalUpdateBackingStore(self):
+        if self.m_isSuper:
+            return
+
         dc = wx.MemoryDC()
         dc.SelectObject(self.m_backingStore)
 
@@ -326,6 +357,8 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
             self.DisposeToBackground(dc)
         else:
             dispose_method = self.m_animation.GetDisposalMethod(self.m_currentFrame - 1)
+
+            print dispose_method
 
             if dispose_method == wxANIM_TOBACKGROUND:
                 self.DisposeToBackground(
@@ -351,6 +384,8 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         dc.SelectObject(wx.NullBitmap)
 
     def UpdateStaticImage(self):
+        if self.m_isSuper:
+            return
 
         if not self.m_bmpStaticReal.IsOk() or not self.m_bmpStatic.IsOk():
             return
@@ -396,6 +431,9 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
                 self.m_bmpStaticReal = wx.Bitmap(temp)
 
     def RebuildBackingStoreUpToFrame(self, frame):
+        if self.m_isSuper:
+            return
+
         # if we've not created the backing store yet or it's too
         # small, then recreate it
         sz = self.m_animation.GetSize()
@@ -442,6 +480,9 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         return True
 
     def DrawFrame(self, dc, frame):
+        if self.m_isSuper:
+            return
+
         # PERFORMANCE NOTE:
         # this draw stuff is not as fast as possible: the wxAnimationDecoder
         # needs first to convert from its internal format to wxImage RGB24;
@@ -456,6 +497,9 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         )
 
     def DisplayStaticImage(self):
+        if self.m_isSuper:
+            return
+
         assert not self.IsPlaying()
 
         # m_bmpStaticReal will be updated only if necessary...
@@ -485,7 +529,7 @@ class wxAnimationCtrl(wx.adv.wxAnimationCtrl):
         self.Refresh()
 
     def DoGetBestSize(self):
-        if self.m_animation.GetType() != wxANIMATION_TYPE_PNG:
+        if self.m_isSuper:
             return super(wxAnimationCtrl, self).DoGetBestSize()
 
         if self.m_animation.IsOk() and not self.HasFlag(wxAC_NO_AUTORESIZE):

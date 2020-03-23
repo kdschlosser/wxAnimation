@@ -102,13 +102,10 @@ class wxPNGDecoder(animation_decoder.wxAnimationDecoder):
         super(wxPNGDecoder, self).__init__()
 
     def GetData(self, frame):
-        return self.m_frames[frame].p
+        return self.m_frames[frame].image
 
     def GetPalette(self, frame):
         return self.m_frames[frame].pal
-
-    def GetNcolours(self, frame):
-        return self.m_frames[frame].ncolours
 
     def GetFrameSize(self, frame):
         frame = self.m_frames[frame]
@@ -131,7 +128,11 @@ class wxPNGDecoder(animation_decoder.wxAnimationDecoder):
         return self.m_nFrames > 1
 
     def LoadPNG(self, stream):
+        stream.seek(0)
         stream_data = bytearray(stream.read())
+        if stream_data[:8] != PNG_HEADER:
+            return wxPNG_INVFORMAT
+
         hdr = None
         head_chunks = []
         end = _make_chunk(PNG_MARKER_IEND, bytearray())
@@ -154,13 +155,15 @@ class wxPNGDecoder(animation_decoder.wxAnimationDecoder):
                 continue
 
             elif chunk_type == PNG_MARKER_fcTL:
+                print len(chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
+                print repr(chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
                 if any(type_ == PNG_MARKER_IDAT for type_, data in frame_chunks):
                     frame_chunks.append(end)
                     control.image = PNGImage(frame_chunks)
                     frames.append(control)
                     frame_has_head_chunks = False
-                    control = PNGFrame(*struct.unpack("!IIIIHHbb", chunk_data[11:-4]))
-
+                    print struct.unpack("!IIIIIHHbb", chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
+                    control = PNGFrame(*struct.unpack("!IIIIIHHbb", chunk_data.split(PNG_MARKER_fcTL)[-1][:-4]))
                     hdr = _make_chunk(
                         PNG_MARKER_IHDR,
                         struct.pack("!II", control.width, control.height) + hdr[1][16:-4]
@@ -168,7 +171,10 @@ class wxPNGDecoder(animation_decoder.wxAnimationDecoder):
 
                     frame_chunks = [hdr]
                 else:
-                    control = PNGFrame(*struct.unpack("!IIIIHHbb", chunk_data[11:-4]))
+                    print len(chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
+                    print repr(chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
+                    print struct.unpack("!IIIIIHHbb", chunk_data.split(PNG_MARKER_fcTL)[-1][:-4])
+                    control = PNGFrame(*struct.unpack("!IIIIIHHbb", chunk_data.split(PNG_MARKER_fcTL)[-1][:-4]))
 
             elif chunk_type == PNG_MARKER_IDAT:
                 if not frame_has_head_chunks:
@@ -198,7 +204,7 @@ class wxPNGDecoder(animation_decoder.wxAnimationDecoder):
         self.m_frames = sorted(frames, key=lambda x: x.index)
         self.m_plays = num_plays
         self.m_nFrames = num_frames
-        return True
+        return wxPNG_OK
 
     def Destroy(self):
         assert self.m_nFrames == len(self.m_frames)
@@ -214,8 +220,8 @@ class wxPNGDecoder(animation_decoder.wxAnimationDecoder):
 
     def ConvertToImage(self, frame):
         frame = self.m_frames[frame]
-        image = wx.Image(frame.p, wx.BITMAP_TYPE_PNG)
-        return image
+        bmp = wx.Bitmap(frame.image, wx.BITMAP_TYPE_PNG)
+        return bmp.ConvertToImage()
 
     def Clone(self):
         return wxPNGDecoder()
@@ -244,13 +250,13 @@ wxPNG_MEMERR = 2  # error allocating memory
 wxPNG_TRUNCATED = 3  # file appears to be truncated
 
 
-class PNGImage(wx.Image):
+def PNGImage(frame_chunks):
+    chunks = bytearray(PNG_HEADER)
+    for c in frame_chunks:
+        chunks.extend(c[1])
 
-    def __init__(self, frame_chunks):
-        chunks = [PNG_HEADER]
-        chunks.extend(c[1] for c in frame_chunks)
-        stream = io.BytesIO(bytearray("".join(chunks)))
-        super(PNGImage, self).__init__(stream, wx.BITMAP_TYPE_PNG)
+    stream = io.BytesIO(chunks)
+    return wx.Image(stream, wx.BITMAP_TYPE_PNG)
 
 
 class PNGFrame(object):
@@ -279,10 +285,10 @@ class PNGFrame(object):
         self.image = None
 
         if delay_num == 0:
-            self.delay = 0
+            self.delay = 0.0
         else:
             if delay_den == 0:
-                delay_den = 100
+                delay_den = 100.0
 
-            self.delay = float(delay_num) / float(delay_den)
+            self.delay = (float(delay_num) / float(delay_den)) * 1000.0
 
