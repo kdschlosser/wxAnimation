@@ -82,6 +82,7 @@ class wxAnimationCtrl(wx.adv.AnimationCtrl):
             self.m_isPlaying = False
             self.m_useWinBackgroundColour = True
             self.m_backingStore = wx.Bitmap(0, 0)
+            self.m_lastRendered = wx.Bitmap(0, 0)
             super(wxAnimationCtrl, self).__init__(parent, id, wx.adv.NullAnimation, pos, size, style, name)
             self.m_timer = wx.Timer(self)
 
@@ -307,18 +308,14 @@ class wxAnimationCtrl(wx.adv.AnimationCtrl):
 
         #  m_backingStore always contains the current frame
         dc.DrawBitmap(self.m_backingStore, 0, 0, True)  # use mask in case it's present
+        dc.Destroy()
+        del dc
 
     def GetBackingStore(self):
         if self.m_isSuper:
             return
 
         return self.m_backingStore
-
-    def FitToAnimation(self):
-        if self.m_isSuper:
-            return
-
-        self.SetSize(self.m_animation.GetSize())
 
     def DisposeToBackground(self, dc=None, pos=None, sz=None):
         if self.m_isSuper:
@@ -330,9 +327,11 @@ class wxAnimationCtrl(wx.adv.AnimationCtrl):
             dc.SelectObject(self.m_backingStore)
             if dc.IsOk():
                 self.DisposeToBackground(dc)
+
+            dc.Destroy()
+            del dc
         else:
             if self.IsUsingWindowBackgroundColour():
-
                 col = self.GetBackgroundColour()
             else:
                 col = self.m_animation.GetBackgroundColour()
@@ -342,7 +341,6 @@ class wxAnimationCtrl(wx.adv.AnimationCtrl):
             if pos is None and sz is None:
                 dc.SetBackground(brush)
                 dc.Clear()
-
             else:
                 dc.SetBrush(brush)
                 dc.SetPen(wx.TRANSPARENT_PEN)
@@ -383,12 +381,16 @@ class wxAnimationCtrl(wx.adv.AnimationCtrl):
                     # the best we can do is to restore to background
                     self.DisposeToBackground(dc)
                 else:
-                    if not self.RebuildBackingStoreUpToFrame(self.m_currentFrame - 2):
+                    if not self.RebuildBackingStoreUpToFrame(self.m_currentFrame - 1):
                         self.Stop()
 
         # now just draw the current frame on the top of the backing store
         self.DrawFrame(dc, self.m_currentFrame)
         dc.SelectObject(wx.NullBitmap)
+        dc.Destroy()
+        del dc
+
+        self.m_lastRendered = self.m_backingStore
 
     def UpdateStaticImage(self):
         if self.m_isSuper:
@@ -431,6 +433,11 @@ class wxAnimationCtrl(wx.adv.AnimationCtrl):
                     (sz.GetHeight() - self.m_bmpStatic.GetHeight()) / 2,
                     True  # use mask */
                 )
+
+                dc.SelectObject(wx.NullBitmap)
+                dc.Destroy()
+                del dc
+
             else:
                 # the user-provided bitmap is bigger than our control, strech it
                 temp = self.m_bmpStatic.ConvertToImage()
@@ -496,12 +503,22 @@ class wxAnimationCtrl(wx.adv.AnimationCtrl):
         # the wxImage is then converted as a wxBitmap and finally blitted.
         # If wxAnimationDecoder had a function to convert directly from its
         # internal format to a port-specific wxBitmap, it would be somewhat faster.
-        bmp = wx.Bitmap(self.m_animation.GetFrame(frame))
-        dc.DrawBitmap(
-            bmp,
-            self.m_animation.GetFramePosition(frame),
-            True  # use mask
-        )
+
+        if self.IsUsingWindowBackgroundColour():
+            col = self.GetBackgroundColour()
+        else:
+            col = self.m_animation.GetBackgroundColour()
+
+        dc.SetBrush(wx.Brush(col))
+        dc.SetPen(wx.TRANSPARENT_PEN)
+
+        self.m_animation.DrawFrame(dc, frame)
+        # bmp = wx.Bitmap(self.m_animation.GetFrame(frame))
+        # dc.DrawBitmap(
+        #     bmp,
+        #     self.m_animation.GetFramePosition(frame),
+        #     True  # use mask
+        # )
 
     def DisplayStaticImage(self):
         if self.m_isSuper:
@@ -517,11 +534,15 @@ class wxAnimationCtrl(wx.adv.AnimationCtrl):
             # copy the inactive bitmap in the backing store
             # eventually using the mask if the static bitmap has one
             if self.m_bmpStaticReal.GetMask():
-                temp = wx.MemoryDC()
-                temp.SelectObject(self.m_backingStore)
-                self.DisposeToBackground(temp)
-                temp.DrawBitmap(self.m_bmpStaticReal, 0, 0, True)  # use mask
+                dc = wx.MemoryDC()
+                dc.SelectObject(self.m_backingStore)
+                self.DisposeToBackground(dc)
 
+                dc.DrawBitmap(self.m_bmpStaticReal, 0, 0, True)  # use mask
+
+                dc.SelectObject(wx.NullBitmap)
+                dc.Destroy()
+                del dc
             else:
                 self.m_backingStore = self.m_bmpStaticReal
         else:
@@ -534,6 +555,12 @@ class wxAnimationCtrl(wx.adv.AnimationCtrl):
                 self.DisposeToBackground()
 
         self.Refresh()
+
+    def FitToAnimation(self):
+        if self.m_isSuper:
+            return
+
+        self.SetSize(self.m_animation.GetSize())
 
     def DoGetBestSize(self):
         if self.m_isSuper:

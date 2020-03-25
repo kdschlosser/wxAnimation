@@ -24,13 +24,28 @@
 
 # ***********************************************************************************
 
-from . import animation_decoder
+from .. import animation_decoder
+from ..animation import wxAnimation
+
 import wx
 import io
 import struct
 import binascii
 
 wxANIMATION_TYPE_PNG = 4
+
+# all color components of the frame, including alpha,
+# overwrite the current contents of the frame's output buffer region.
+wxANIM_APNG_BLENDOP_SOURCE = 0
+
+# frame should be composited onto the output buffer based on its alpha,
+# using a simple OVER operation
+wxANIM_APNG_BLENDOP_OVER = 1
+
+wxPNG_OK = 0  # everything was OK
+wxPNG_INVFORMAT = 1  # error in PNG header
+wxPNG_MEMERR = 2  # error allocating memory
+wxPNG_TRUNCATED = 3  # file appears to be truncated
 
 PNG_HEADER = bytearray('\x89\x50\x4E\x47\x0D\x0A\x1A\x0A')
 
@@ -231,25 +246,23 @@ class wxPNGDecoder(animation_decoder.wxAnimationDecoder):
     def GetType(self):
         return wxANIMATION_TYPE_PNG
 
+    def DrawFrame(self, dc, frame):
+        bmp = wx.Bitmap(self.GetData(frame))
+        if self.GetBlendMethod(frame) == wxANIM_APNG_BLENDOP_SOURCE:
+             dc.DrawRectangle(self.GetFramePosition(frame), self.GetFrameSize(frame))
+
+        dc.DrawBitmap(
+            bmp,
+            self.GetFramePosition(frame),
+            True  # use mask
+        )
+
     def DoCanRead(self, stream):
         data = stream.read(8)
         return data == PNG_HEADER
 
 
 NullPNGDecoder = wxPNGDecoder()
-
-# all color components of the frame, including alpha,
-# overwrite the current contents of the frame's output buffer region.
-wxANIM_APNG_BLENDOP_SOURCE = 0
-
-# frame should be composited onto the output buffer based on its alpha,
-# using a simple OVER operation
-wxANIM_APNG_BLENDOP_OVER = 1
-
-wxPNG_OK = 0  # everything was OK
-wxPNG_INVFORMAT = 1  # error in PNG header
-wxPNG_MEMERR = 2  # error allocating memory
-wxPNG_TRUNCATED = 3  # file appears to be truncated
 
 
 def PNGImage(frame_chunks):
@@ -294,3 +307,5 @@ class PNGFrame(object):
 
             self.delay = (float(delay_num) / float(delay_den)) * 1000.0
 
+
+wxAnimation.AddHandler(wxPNGDecoder())

@@ -105,5 +105,8 @@ class wxAnimationDecoder(wxObjectRefData):
     def DoCanRead(self, stream):
         return 0
 
+    def DrawFrame(self, dc, frame):
+        raise NotImplementedError
+
 
 NullAnimationDecoder = wxAnimationDecoder()

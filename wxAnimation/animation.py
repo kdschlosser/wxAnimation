@@ -28,8 +28,6 @@ import wx.adv
 import wx
 import io
 
-from .png_animation_decoder import wxPNGDecoder
-
 wxANIMATION_TYPE_INVALID = 0
 wxANIMATION_TYPE_ANI = 2
 wxANIMATION_TYPE_GIF = 1
@@ -186,8 +184,8 @@ class wxAnimation(wx.adv.Animation):
 
     @staticmethod
     def InitStandardHandlers():
-        wxAnimation.sm_handlers.append(wxPNGDecoder())
+        pass
 
-
-wxAnimation.InitStandardHandlers()
-
+    def DrawFrame(self, dc, frame):
+        if not self.m_isSuper:
+            return self.m_refData.DrawFrame(dc, frame)
